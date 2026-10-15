@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { IS_WIN, NODE, sandbox, write } from "./helpers.mjs";
 import { checkHook, shellWords } from "../src/check.mjs";
+import { resolveExecutable } from "../src/runner.mjs";
 
 const entry = (event, raw, extra = {}) => ({ event, eventKnown: true, matcher: undefined, raw, scope: "user", label: "user settings", file: "/x/settings.json", plugin: null, pluginRoot: null, pluginData: null, ...extra });
 const msgs = (h, ctx = {}) => checkHook(h, { platform: "linux", env: { PATH: process.env.PATH }, ...ctx }).map((f) => `${f.severity}: ${f.message}`);
@@ -100,7 +101,10 @@ test("the command itself: placeholders, executables, scripts, jq, PowerShell var
   assert.ok(!has(sh(NODE, { args: [path.join(s.proj, "there.mjs")] }), /error/));
   assert.ok(has(sh(`${path.join(s.proj, "nope.sh")}`), /error: .*nope\.sh" does not exist, so the shell cannot run it/));
   assert.ok(has(sh("node ./scripts/missing.js --fix"), /error: \.\/scripts\/missing\.js does not exist/));
-  assert.ok(has(sh("jq -r .tool_input.command"), fs.existsSync("/usr/bin/jq") || process.env.PATH.split(path.delimiter).some((d) => fs.existsSync(path.join(d, IS_WIN ? "jq.exe" : "jq"))) ? /^(?!x)/ : /error: "jq" was not found on PATH \(install jq/));
+  // jq is on the CI runners and not on every machine: the finding must follow the machine
+  const jqHere = !!resolveExecutable("jq", { cwd: s.proj, env: process.env });
+  if (jqHere) assert.ok(!has(sh("jq -r .tool_input.command"), /jq/), "no finding about jq when it is installed");
+  else assert.ok(has(sh("jq -r .tool_input.command"), /error: "jq" was not found on PATH \(install jq/));
   assert.ok(has(sh("${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh"), /warn: a path placeholder in shell form should be in double quotes/));
   assert.ok(!has(sh('"${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh"'), /warn: a path placeholder/));
   assert.ok(has(sh("echo hi > /dev/tty"), /warn: \/dev\/tty is not available to hooks/));
