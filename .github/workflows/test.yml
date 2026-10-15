@@ -1,0 +1,46 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22, 24]
+        include:
+          - os: ubuntu-latest
+            node: 18
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version && git --version
+      - run: npm test
+
+  # The checks that need the real Claude Code binary: the plugin validates, a recording hook on every event
+  # compares the binary's JSON with the bench's fixtures, and a table of hook outputs is put to the binary to see
+  # whether it ran or refused the tool call, which must match the bench's verdict. A fake Messages API on
+  # 127.0.0.1 answers every request, so no model is reached and no token is spent.
+  claude:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude --version
+      - run: node --test test/e2e-claude.test.mjs
+        env:
+          E2E_CLAUDE: claude
