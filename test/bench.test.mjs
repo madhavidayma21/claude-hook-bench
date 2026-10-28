@@ -332,6 +332,7 @@ test("run --http: post event JSON to http hooks, judge the five response kinds, 
   let recordedBody = null;
   const server = http.createServer((req, res) => {
     let body = "";
+    req.setEncoding("utf8"); // so a character split across two chunks still decodes
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       recordedHeaders = req.headers;
