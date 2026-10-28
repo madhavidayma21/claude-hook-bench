@@ -360,6 +360,11 @@ test("run --http: post event JSON to http hooks, judge the five response kinds, 
 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = server.address().port;
+  // A port that was open a moment ago and is closed now: a connection to it is refused.
+  const closer = http.createServer();
+  await new Promise((resolve) => closer.listen(0, "127.0.0.1", resolve));
+  const closedPort = closer.address().port;
+  await new Promise((resolve) => closer.close(resolve));
   const base = `http://127.0.0.1:${port}`;
 
   try {
@@ -373,8 +378,8 @@ test("run --http: post event JSON to http hooks, judge the five response kinds, 
             { matcher: "Bash", hooks: [{ type: "http", url: `${base}/other-body`, onFailure: "block" }] },
             { matcher: "Bash", hooks: [{ type: "http", url: `${base}/error-500` }] },
             { matcher: "Bash", hooks: [{ type: "http", url: `${base}/error-500`, onFailure: "block" }] },
-            { matcher: "Bash", hooks: [{ type: "http", url: "http://127.0.0.1:59999/down" }] },
-            { matcher: "Bash", hooks: [{ type: "http", url: "http://127.0.0.1:59999/down", onFailure: "block" }] },
+            { matcher: "Bash", hooks: [{ type: "http", url: `http://127.0.0.1:${closedPort}/down` }] },
+            { matcher: "Bash", hooks: [{ type: "http", url: `http://127.0.0.1:${closedPort}/down`, onFailure: "block" }] },
             { matcher: "Bash", hooks: [{ type: "http", url: `${base}/env-headers`, headers: { "Authorization": "Bearer $TOKEN", "X-Unallowed": "$SECRET", "X-Braced": "${TOKEN}", "X-Mixed": "$TOKEN-$SECRET" }, allowedEnvVars: ["TOKEN"] }] },
           ],
         },
@@ -410,10 +415,10 @@ test("run --http: post event JSON to http hooks, judge the five response kinds, 
     assert.equal(m.runs[2].verdict.verdict, "non-blocking error");
     assert.match(m.runs[2].verdict.problems[0], /not a JSON object/);
 
-    // #4: 2xx with other body and onFailure: "block" -> still non-blocking error!
+    // #4: 2xx with other body and onFailure: "block" -> invalid output, which blocks
     assert.equal(m.runs[3].run.status, "ran");
-    assert.equal(m.runs[3].verdict.outcome, "error");
-    assert.equal(m.runs[3].verdict.verdict, "non-blocking error");
+    assert.equal(m.runs[3].verdict.outcome, "block");
+    assert.equal(m.runs[3].verdict.verdict, "blocks");
 
     // #5: non-2xx status code (500) -> non-blocking error
     assert.equal(m.runs[4].run.status, "ran");

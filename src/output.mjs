@@ -152,7 +152,8 @@ export function judge(eventName, hook, run) {
       return { outcome: "error", verdict: "non-blocking error", effects, problems, warnings, parsed, validation };
     }
     if (parsed.kind !== "empty" && parsed.kind !== "json") {
-      problems.push("HTTP response body is not a JSON object: a non-blocking error");
+      problems.push("HTTP response body is not a JSON object: invalid output, a non-blocking error");
+      if (onFailureBlock) return blockedByFailure("invalid output");
       effects.push(canBlock ? "the action goes ahead; a hook error notice appears in the transcript" : "a hook error notice appears in the transcript");
       return { outcome: "error", verdict: "non-blocking error", effects, problems, warnings, parsed, validation };
     }

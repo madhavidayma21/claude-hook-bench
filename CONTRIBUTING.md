@@ -35,7 +35,7 @@ npm test
 
 ## House rules
 
-1. **No dependencies.** Node built-ins only, Node 18 or newer, ES modules (`.mjs`). A pull request that adds a package to `dependencies` will not be merged. Only `src/runner.mjs` may start a process, and nothing may open a network connection; a test fails otherwise.
+1. **No dependencies.** Node built-ins only, Node 18 or newer, ES modules (`.mjs`). A pull request that adds a package to `dependencies` will not be merged. Only `src/runner.mjs` may start a process, and only `src/http.mjs` may open a network connection (the opt-in `run --http`); a test fails otherwise.
 2. **Every change comes with a test**, and `npm test` passes. CI runs the suite on Windows, macOS and Linux with Node 20, 22 and 24, and on Linux with Node 18, and the real-binary checks on Linux and macOS; a change that only works on one of them is not done.
 3. **The binary is right.** The fixtures and the verdicts describe what Claude Code does. When they are wrong, add the case to `test/e2e-claude.test.mjs` (a fixture oracle row or an output oracle row) with what the binary does, fix the table, and say so in the README's "What was verified". Do not change a row to make a test pass without running it against the binary.
 4. **Token cost is a feature.** It runs outside Claude; the optional skill is user-only and its report is capped. If your change puts anything new in front of Claude, say how many tokens in the pull request and update the README's "What it costs in tokens".

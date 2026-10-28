@@ -284,15 +284,16 @@ test("http hook response judging covers the five response kinds", () => {
   assert.equal(denyJson.outcome, "block");
   assert.equal(denyJson.verdict, "denies");
 
-  // 3. 2xx with any other body: non-blocking error (even with onFailure: block)
+  // 3. 2xx with any other body: invalid output, a non-blocking error unless onFailure is block
   const textBody = judge("PreToolUse", httpHook, ran("plain text", 0));
   assert.equal(textBody.outcome, "error");
   assert.equal(textBody.verdict, "non-blocking error");
   assert.match(textBody.problems[0], /not a JSON object/);
 
   const textBodyBlock = judge("PreToolUse", httpBlock, ran("plain text", 0));
-  assert.equal(textBodyBlock.outcome, "error", "2xx with non-JSON body stays a non-blocking error");
-  assert.equal(textBodyBlock.verdict, "non-blocking error");
+  assert.equal(textBodyBlock.outcome, "block", "2xx with a non-JSON body is invalid output, which onFailure: block turns into a block");
+  assert.equal(textBodyBlock.verdict, "blocks");
+  assert.match(textBodyBlock.effects[0], /invalid output; blocking because onFailure is "block"/);
 
   const invalidJson = judge("PreToolUse", httpHook, ran("{bad json", 0));
   assert.equal(invalidJson.outcome, "error");
