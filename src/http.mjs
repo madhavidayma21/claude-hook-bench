@@ -3,21 +3,23 @@
 import http from "node:http";
 import https from "node:https";
 
-/** Find environment variable references in an HTTP header value. */
+/** The one pattern for an environment variable reference in a header value: $VAR or ${VAR}. The check and the request both use it. */
+export const ENV_REF = /\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
+
+/** The variable names a header value refers to, in order ($TOKEN-$SECRET holds two). */
 export function headerEnvVars(value) {
   if (typeof value !== "string") return [];
-  return [...value.matchAll(/\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)/g)]
-    .map((match) => match[1] || match[2]);
+  return [...value.matchAll(ENV_REF)].map((match) => match[1] || match[2]);
 }
-/** Resolve $VAR and ${VAR} in headers, filling only variables listed in allowedEnvVars. */
 
+/** Resolve $VAR and ${VAR} in headers, filling only variables listed in allowedEnvVars. */
 export function resolveHeaders(rawHeaders, allowedEnvVars, env = process.env) {
   const headers = {};
   if (!rawHeaders || typeof rawHeaders !== "object") return headers;
   const allowed = new Set(Array.isArray(allowedEnvVars) ? allowedEnvVars : []);
   for (const [key, val] of Object.entries(rawHeaders)) {
     if (typeof val === "string") {
-      headers[key] = val.replace(/\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, p1, p2) => {
+      headers[key] = val.replace(ENV_REF, (match, p1, p2) => {
         const name = p1 || p2;
         if (allowed.has(name)) {
           return env[name] !== undefined ? env[name] : "";

@@ -3,9 +3,9 @@
 //   error  the hook will not run, or will not do what it says
 //   warn   it runs, but something is off (a field that is ignored, a pitfall the reference names)
 //   info   worth knowing, nothing to fix
-import { headerEnvVars } from "./http.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { headerEnvVars } from "./http.mjs";
 import { EVENT_NAMES, TOOL_EVENTS, eventByName, matcherKind, matcherList } from "./events.mjs";
 import { candidateValues } from "./fixtures.mjs";
 import { parseRule } from "./matcher.mjs";
@@ -111,7 +111,14 @@ export function checkHook(h, ctx = {}) {
   }
   if (type === "http") {
     if (typeof raw.url !== "string" || !/^https?:\/\//.test(raw.url)) push("error", 'an http hook needs a "url" starting with http:// or https://');
-    if (raw.headers && typeof raw.headers === "object" && Object.values(raw.headers).some(val => headerEnvVars(val).some(name => !Array.isArray(raw.allowedEnvVars) || !raw.allowedEnvVars.includes(name)))) push("warn", 'the headers reference an environment variable, but "allowedEnvVars" does not list it: Claude Code replaces unlisted references with empty strings');
+    const headerRefs = raw.headers && typeof raw.headers === "object" ? Object.entries(raw.headers).map(([key, val]) => [key, [...new Set(headerEnvVars(val))]]) : [];
+    if (!Array.isArray(raw.allowedEnvVars)) {
+      if (headerRefs.some(([, names]) => names.length)) push("warn", 'the headers reference an environment variable, but "allowedEnvVars" does not list it: Claude Code replaces unlisted references with empty strings');
+    } else {
+      for (const [key, names] of headerRefs) for (const name of names) if (!raw.allowedEnvVars.includes(name)) push("warn", `the header ${JSON.stringify(key)} uses $${name}, which allowedEnvVars does not list: Claude Code sends an empty string for it`);
+      const used = new Set(headerRefs.flatMap(([, names]) => names));
+      for (const name of raw.allowedEnvVars) if (typeof name === "string" && !used.has(name)) push("info", `allowedEnvVars lists ${name}, which no header uses`);
+    }
     if (h.event === "WorktreeCreate") push("info", "an HTTP WorktreeCreate hook returns hookSpecificOutput.worktreePath");
   }
   if (type === "mcp_tool") {
